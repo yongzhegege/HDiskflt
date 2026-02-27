@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Diskflt 驱动使用说明书</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background-color: #f4f7f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 60px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-radius: 8px;
+            position: relative;
+        }
+        .lang-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #0056b3;
+            background: #fff;
+            color: #0056b3;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .lang-btn:hover {
+            background: #0056b3;
+            color: #fff;
+        }
+        .lang-btn.active {
+            background: #0056b3;
+            color: #fff;
+        }
+        h1 {
+            color: #0056b3;
+            text-align: center;
+            font-weight: 300;
+            font-size: 32px;
+            border-bottom: 1px solid #e1e4e8;
+            padding-bottom: 25px;
+            margin-bottom: 45px;
+        }
+        h2 {
+            color: #0056b3;
+            border-left: 4px solid #0056b3;
+            padding: 10px 15px;
+            margin-top: 50px;
+            background: #f0f7ff;
+            border-radius: 0 4px 4px 0;
+            font-size: 22px;
+        }
+        h3 {
+            color: #2c3e50;
+            margin-top: 30px;
+            font-weight: 600;
+            font-size: 18px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        p, li {
+            font-size: 16px;
+            color: #444;
+        }
+        strong {
+            color: #0056b3;
+        }
+        code {
+            background-color: #eef4fa;
+            color: #0366d6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            font-size: 0.95em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        th {
+            background-color: #0056b3;
+            color: #fff;
+            padding: 15px;
+            text-align: left;
+            font-weight: 500;
+        }
+        td {
+            border-bottom: 1px solid #e1e4e8;
+            padding: 15px;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #f1f7ff;
+        }
+        .diagram {
+            background: #f8f9fa;
+            border: 1px dashed #bdd4ea;
+            padding: 30px;
+            text-align: center;
+            font-family: "Consolas", monospace;
+            color: #555;
+            margin: 25px 0;
+            border-radius: 6px;
+            line-height: 1.4;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            color: #888;
+            font-size: 14px;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+        }
+        .lang-section {
+            display: none;
+        }
+        .lang-section.active {
+            display: block;
+        }
+        .version-info {
+            text-align: center;
+            color: #777;
+            margin-top: -30px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Language Switch Button -->
+    <div class="lang-switch">
+        <button class="lang-btn active" onclick="switchLang('zh')" id="btn-zh">中文</button>
+        <button class="lang-btn" onclick="switchLang('en')" id="btn-en">English</button>
+    </div>
+
+    <!-- Chinese Content -->
+    <div id="content-zh" class="lang-section active">
+        <h1>Diskflt 驱动系统使用说明书</h1>
+        <p class="version-info">版本: 1.0</p>
+
+        <h2>1. 产品简介</h2>
+        <p><strong>Diskflt</strong> 是一款基于 Windows 内核的磁盘过滤驱动程序（Disk Filter Driver），专为系统保护和数据还原场景设计。该驱动工作在 Windows 存储堆栈的磁盘类驱动（Disk Class Driver）之上，能够拦截对物理磁盘的读写请求，实现"影子模式"（Shadow Mode）保护。</p>
+        <p>开启保护后，用户对受保护磁盘的所有写入操作都将被重定向到内存或临时存储区域，而不会修改物理硬盘上的真实数据。当计算机重启后，所有临时数据将被丢弃，系统瞬间还原到保护前的状态，从而有效防止病毒破坏、误操作或恶意软件篡改系统。</p>
+
+        <h2>2. 功能特点</h2>
+        <ul>
+            <li><strong>实时还原保护</strong>：支持对选定的磁盘分区进行扇区级写保护，重启即还原。</li>
+            <li><strong>多分区支持</strong>：可灵活配置需要保护的分区（如仅保护 C 盘系统盘，或同时保护 D 盘数据盘）。</li>
+            <li><strong>底层驱动拦截</strong>：基于 WDM/WDF 框架的 Upper Filter 驱动，抗干扰能力强，难以被普通应用层恶意软件绕过。</li>
+            <li><strong>配置持久化</strong>：保护配置信息存储于物理磁盘的隐藏扇区（Sector 62），防止文件系统损坏导致配置丢失。</li>
+            <li><strong>透明运行</strong>：对上层文件系统和应用程序完全透明，不影响系统正常使用习惯。</li>
+        </ul>
+
+        <h2>3. 运行环境与支持</h2>
+        <h3>3.1 硬件要求</h3>
+        <ul>
+            <li>CPU：x86 或 x64 架构处理器</li>
+            <li>内存：建议 4GB 及以上（由于写重定向需要占用一定内存资源）</li>
+            <li>硬盘：支持 HDD、SSD、NVMe 等各类标准磁盘设备</li>
+        </ul>
+
+        <h3>3.2 操作系统支持（仅支持 UEFI）</h3>
+        <ul>
+            <li>Windows 10 (x86/x64)</li>
+            <li>Windows 11 (x64)</li>
+        </ul>
+
+        <h2>4. 安装与卸载</h2>
+        <h3>4.1 安装步骤</h3>
+        <ol>
+            <li>确保已获取完整的安装包（包含 <code>diskflt.sys</code>, <code>diskflt.inf</code>, <code>diskflt.cat</code>, <code>install.bat</code> 及 <code>Protection.exe</code>）。</li>
+            <li><strong>以管理员身份运行</strong> <code>install.bat</code> 脚本。</li>
+            <li>脚本会自动执行以下操作：
+                <ul>
+                    <li>将驱动文件复制到 <code>System32\drivers</code> 目录。</li>
+                    <li>创建 <code>diskflt</code> 系统服务（启动类型：Boot Start）。</li>
+                    <li>在注册表 <code>HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e967-e325-11ce-bfc1-08002be10318}</code> 的 <code>UpperFilters</code> 项中添加 <code>diskflt</code>。</li>
+                </ul>
+            </li>
+            <li>安装完成后，<strong>必须重启计算机</strong>以使驱动加载生效。</li>
+        </ol>
+
+        <h3>4.2 卸载步骤</h3>
+        <ol>
+            <li>运行卸载脚本（或手动从注册表 <code>UpperFilters</code> 中移除 <code>diskflt</code> 字符串）。</li>
+            <li>删除 <code>diskflt</code> 服务：<code>sc delete diskflt</code>。</li>
+            <li>重启计算机。</li>
+            <li>删除 <code>System32\drivers\diskflt.sys</code> 文件。</li>
+        </ol>
+
+        <h2>5. 原理与流程</h2>
+        <h3>5.1 驱动架构图</h3>
+        <div class="diagram">
+            [应用程序 (Word, Explorer等)]<br>
+            ⬇️ ⬆️<br>
+            [文件系统驱动 (NTFS/FAT)]<br>
+            ⬇️ ⬆️<br>
+            [卷管理驱动 (Volmgr)]<br>
+            ⬇️ ⬆️<br>
+            <strong style="color: #0056b3;">[Diskflt 过滤驱动 (本产品)]</strong> &lt;--- 拦截/重定向<br>
+            ⬇️ ⬆️<br>
+            [磁盘类驱动 (Disk.sys)]<br>
+            ⬇️ ⬆️<br>
+            [物理硬盘]
+        </div>
+
+        <h3>5.2 读写处理流程</h3>
+        <p><strong>写入流程 (Write Request):</strong></p>
+        <ol>
+            <li>上层发送 <code>IRP_MJ_WRITE</code> 请求。</li>
+            <li>Diskflt 拦截该请求，判断目标扇区是否属于受保护卷。</li>
+            <li><strong>若是受保护卷</strong>：
+                <ul>
+                    <li>在内存/临时区中分配空间。</li>
+                    <li>将数据写入临时区。</li>
+                    <li>更新重定向位图（Redirect Bitmap），标记该扇区已被修改。</li>
+                    <li>向系统返回"写入成功"状态（欺骗上层），实际未修改物理硬盘。</li>
+                </ul>
+            </li>
+            <li><strong>若非受保护卷</strong>：
+                <ul>
+                    <li>直接将请求下发给底层驱动，写入物理硬盘。</li>
+                </ul>
+            </li>
+        </ol>
+
+        <p><strong>读取流程 (Read Request):</strong></p>
+        <ol>
+            <li>上层发送 <code>IRP_MJ_READ</code> 请求。</li>
+            <li>Diskflt 拦截请求，查询重定向位图。</li>
+            <li><strong>若扇区已被修改</strong>（存在于临时区）：
+                <ul>
+                    <li>从临时区读取最新数据返回给上层。</li>
+                </ul>
+            </li>
+            <li><strong>若扇区未被修改</strong>：
+                <ul>
+                    <li>从物理硬盘读取原始数据返回。</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h2>6. Protection 软件操作说明</h2>
+        <p><code>Protection.exe</code> 是用户配置保护策略的管理工具（命令行版本）。</p>
+
+        <h3>6.1 运行与权限</h3>
+        <ul>
+            <li>运行软件需要<strong>管理员权限</strong>（必须以管理员身份运行）。</li>
+            <li>软件无图形界面，通过命令行参数进行交互。</li>
+            <li>可以通过 <code>Protection.exe /q</code> 查看当前系统中所有分区的保护状态。</li>
+        </ul>
+
+        <h3>6.2 开启/关闭保护</h3>
+        <p>通过命令行工具控制保护状态：</p>
+        <ul>
+            <li><strong>开启保护</strong>：<code>Protection.exe &lt;盘符&gt; /r</code><br>例如：<code>Protection.exe C /r</code>（开启 C 盘保护）</li>
+            <li><strong>关闭保护</strong>：<code>Protection.exe &lt;盘符&gt; /w</code><br>例如：<code>Protection.exe C /w</code>（关闭 C 盘保护）</li>
+        </ul>
+        <p><strong>注意</strong>：配置修改后，必须<strong>重启计算机</strong>才能生效。</p>
+
+        <h3>6.3 参数说明</h3>
+        <table>
+            <tr>
+                <th width="30%">参数项</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>Magic Char</td>
+                <td><code>[dbgger][dbgger]</code> - 用于校验配置扇区是否有效的特征码。</td>
+            </tr>
+            <tr>
+                <td>VolumeInfo</td>
+                <td>32字节数组，对应 A-Z 盘符。1 表示保护，0 表示不保护。</td>
+            </tr>
+        </table>
+
+        <h3>6.4 命令行参数说明</h3>
+        <p><code>Protection.exe</code> 支持命令行操作，方便管理员进行批量部署或脚本控制。</p>
+        <table>
+            <tr>
+                <th>命令格式</th>
+                <th>功能描述</th>
+                <th>示例</th>
+            </tr>
+            <tr>
+                <td><code>Protection.exe &lt;盘符&gt; /r</code></td>
+                <td>开启指定分区的保护（还原模式）。</td>
+                <td><code>Protection.exe C /r</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe &lt;盘符&gt; /w</code></td>
+                <td>关闭指定分区的保护（写入模式）。</td>
+                <td><code>Protection.exe D /w</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /q</code></td>
+                <td>查询当前所有分区的保护状态。</td>
+                <td><code>Protection.exe /q</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /c</code></td>
+                <td>清除所有保护配置（清空扇区 62）。</td>
+                <td><code>Protection.exe /c</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /u</code></td>
+                <td>完全卸载驱动及服务，并清除配置。</td>
+                <td><code>Protection.exe /u</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /forceupdate &lt;文件&gt;</code></td>
+                <td>强制更新驱动文件（绕过保护）。</td>
+                <td><code>Protection.exe /forceupdate diskflt.sys</code></td>
+            </tr>
+        </table>
+
+        <h2>7. 常见问题 (FAQ)</h2>
+
+        <h3>Q1: Protection 软件提示"无法保存配置"？</h3>
+        <p><strong>原因</strong>：可能是安全软件拦截了对物理磁盘扇区的直接写入操作，或者没有以管理员身份运行。<br>
+        <strong>解决</strong>：右键选择"以管理员身份运行"。暂时关闭杀毒软件，或在驱动已加载的情况下，软件会尝试通过驱动 IOCTL 接口写入配置（这通常不会被拦截）。</p>
+
+        <h3>Q2: 保护模式下，为什么复制进去的文件重启就没了？</h3>
+        <p><strong>回答</strong>：这是正常的。保护模式下所有写入都是临时的，重启后系统会丢弃所有更改，还原到保护前的状态。如需永久保存文件，请先关闭保护，或保存到未保护的分区（如 D 盘）。</p>
+    </div>
+
+    <!-- English Content -->
+    <div id="content-en" class="lang-section">
+        <h1>Diskflt Driver System User Manual</h1>
+        <p class="version-info">Version: 1.0</p>
+
+        <h2>1. Product Introduction</h2>
+        <p><strong>Diskflt</strong> is a Windows kernel-based disk filter driver designed for system protection and data recovery scenarios. The driver operates above the Windows storage stack's Disk Class Driver, intercepting read/write requests to physical disks and implementing "Shadow Mode" protection.</p>
+        <p>When protection is enabled, all write operations to protected disks are redirected to memory or temporary storage areas without modifying the real data on the physical hard drive. When the computer restarts, all temporary data is discarded, and the system instantly reverts to its pre-protection state, effectively preventing virus damage, accidental operations, or malicious software tampering.</p>
+
+        <h2>2. Features</h2>
+        <ul>
+            <li><strong>Real-time Restore Protection</strong>: Supports sector-level write protection for selected disk partitions, with instant restore on reboot.</li>
+            <li><strong>Multi-partition Support</strong>: Flexible configuration of protected partitions (e.g., protect only C: system drive or both C: and D: data drives).</li>
+            <li><strong>Low-level Driver Interception</strong>: Upper Filter driver based on WDM/WDF framework with strong anti-interference capability, difficult to bypass by ordinary application-layer malware.</li>
+            <li><strong>Configuration Persistence</strong>: Protection configuration is stored in hidden disk sectors (Sector 62), preventing configuration loss due to file system corruption.</li>
+            <li><strong>Transparent Operation</strong>: Completely transparent to upper-level file systems and applications, without affecting normal system usage habits.</li>
+        </ul>
+
+        <h2>3. System Requirements</h2>
+        <h3>3.1 Hardware Requirements</h3>
+        <ul>
+            <li>CPU: x86 or x64 architecture processor</li>
+            <li>Memory: 4GB or higher recommended (write redirection requires certain memory resources)</li>
+            <li>Storage: Supports HDD, SSD, NVMe, and other standard disk devices</li>
+        </ul>
+
+        <h3>3.2 Operating System Support (UEFI Only)</h3>
+        <ul>
+            <li>Windows 10 (x86/x64)</li>
+            <li>Windows 11 (x64)</li>
+        </ul>
+
+        <h2>4. Installation and Uninstallation</h2>
+        <h3>4.1 Installation Steps</h3>
+        <ol>
+            <li>Ensure you have the complete installation package (including <code>diskflt.sys</code>, <code>diskflt.inf</code>, <code>diskflt.cat</code>, <code>install.bat</code>, and <code>Protection.exe</code>).</li>
+            <li><strong>Run as Administrator</strong> the <code>install.bat</code> script.</li>
+            <li>The script will automatically perform the following operations:
+                <ul>
+                    <li>Copy driver files to <code>System32\drivers</code> directory.</li>
+                    <li>Create <code>diskflt</code> system service (Start Type: Boot Start).</li>
+                    <li>Add <code>diskflt</code> to the <code>UpperFilters</code> registry entry at <code>HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e967-e325-11ce-bfc1-08002be10318}</code>.</li>
+                </ul>
+            </li>
+            <li>After installation, <strong>you must restart the computer</strong> for the driver to take effect.</li>
+        </ol>
+
+        <h3>4.2 Uninstallation Steps</h3>
+        <ol>
+            <li>Run the uninstall script (or manually remove <code>diskflt</code> from the <code>UpperFilters</code> registry entry).</li>
+            <li>Delete the <code>diskflt</code> service: <code>sc delete diskflt</code>.</li>
+            <li>Restart the computer.</li>
+            <li>Delete the <code>System32\drivers\diskflt.sys</code> file.</li>
+        </ol>
+
+        <h2>5. Principles and Workflow</h2>
+        <h3>5.1 Driver Architecture Diagram</h3>
+        <div class="diagram">
+            [Applications (Word, Explorer, etc.)]<br>
+            ⬇️ ⬆️<br>
+            [File System Driver (NTFS/FAT)]<br>
+            ⬇️ ⬆️<br>
+            [Volume Manager Driver (Volmgr)]<br>
+            ⬇️ ⬆️<br>
+            <strong style="color: #0056b3;">[Diskflt Filter Driver (This Product)]</strong> &lt;--- Intercept/Redirect<br>
+            ⬇️ ⬆️<br>
+            [Disk Class Driver (Disk.sys)]<br>
+            ⬇️ ⬆️<br>
+            [Physical Hard Drive]
+        </div>
+
+        <h3>5.2 Read/Write Processing Flow</h3>
+        <p><strong>Write Process (Write Request):</strong></p>
+        <ol>
+            <li>Upper layer sends <code>IRP_MJ_WRITE</code> request.</li>
+            <li>Diskflt intercepts the request and determines if the target sector belongs to a protected volume.</li>
+            <li><strong>If protected volume</strong>:
+                <ul>
+                    <li>Allocates space in memory/temporary area.</li>
+                    <li>Writes data to temporary area.</li>
+                    <li>Updates Redirect Bitmap, marking the sector as modified.</li>
+                    <li>Returns "write successful" status to the system (deceiving upper layers), without actually modifying the physical hard drive.</li>
+                </ul>
+            </li>
+            <li><strong>If not protected volume</strong>:
+                <ul>
+                    <li>Directly passes the request to the lower-level driver to write to physical hard drive.</li>
+                </ul>
+            </li>
+        </ol>
+
+        <p><strong>Read Process (Read Request):</strong></p>
+        <ol>
+            <li>Upper layer sends <code>IRP_MJ_READ</code> request.</li>
+            <li>Diskflt intercepts the request and queries the Redirect Bitmap.</li>
+            <li><strong>If sector has been modified</strong> (exists in temporary area):
+                <ul>
+                    <li>Reads latest data from temporary area and returns to upper layer.</li>
+                </ul>
+            </li>
+            <li><strong>If sector has not been modified</strong>:
+                <ul>
+                    <li>Reads original data from physical hard drive and returns.</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h2>6. Protection Software Operation Guide</h2>
+        <p><code>Protection.exe</code> is the command-line management tool for configuring protection policies.</p>
+
+        <h3>6.1 Running and Permissions</h3>
+        <ul>
+            <li>The software requires <strong>Administrator privileges</strong> (must run as administrator).</li>
+            <li>The software has no GUI and operates through command-line parameters.</li>
+            <li>Use <code>Protection.exe /q</code> to view the protection status of all partitions.</li>
+        </ul>
+
+        <h3>6.2 Enable/Disable Protection</h3>
+        <p>Control protection status through command-line tool:</p>
+        <ul>
+            <li><strong>Enable Protection</strong>: <code>Protection.exe &lt;drive&gt; /r</code><br>Example: <code>Protection.exe C /r</code> (Enable C: drive protection)</li>
+            <li><strong>Disable Protection</strong>: <code>Protection.exe &lt;drive&gt; /w</code><br>Example: <code>Protection.exe C /w</code> (Disable C: drive protection)</li>
+        </ul>
+        <p><strong>Note</strong>: After configuration changes, you must <strong>restart the computer</strong> for changes to take effect.</p>
+
+        <h3>6.3 Parameter Description</h3>
+        <table>
+            <tr>
+                <th width="30%">Parameter</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>Magic Char</td>
+                <td><code>[dbgger][dbgger]</code> - Signature code used to verify if the configuration sector is valid.</td>
+            </tr>
+            <tr>
+                <td>VolumeInfo</td>
+                <td>32-byte array corresponding to A-Z drive letters. 1 means protected, 0 means not protected.</td>
+            </tr>
+        </table>
+
+        <h3>6.4 Command Line Parameters</h3>
+        <p><code>Protection.exe</code> supports command-line operations for administrators to perform batch deployments or script control.</p>
+        <table>
+            <tr>
+                <th>Command Format</th>
+                <th>Function Description</th>
+                <th>Example</th>
+            </tr>
+            <tr>
+                <td><code>Protection.exe &lt;drive&gt; /r</code></td>
+                <td>Enable protection for specified partition (restore mode).</td>
+                <td><code>Protection.exe C /r</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe &lt;drive&gt; /w</code></td>
+                <td>Disable protection for specified partition (write mode).</td>
+                <td><code>Protection.exe D /w</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /q</code></td>
+                <td>Query protection status of all partitions.</td>
+                <td><code>Protection.exe /q</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /c</code></td>
+                <td>Clear all protection configurations (clear sector 62).</td>
+                <td><code>Protection.exe /c</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /u</code></td>
+                <td>Completely uninstall driver and service, and clear configuration.</td>
+                <td><code>Protection.exe /u</code></td>
+            </tr>
+            <tr>
+                <td><code>Protection.exe /forceupdate &lt;file&gt;</code></td>
+                <td>Force update driver file (bypass protection).</td>
+                <td><code>Protection.exe /forceupdate diskflt.sys</code></td>
+            </tr>
+        </table>
+
+        <h2>7. Frequently Asked Questions (FAQ)</h2>
+
+        <h3>Q1: Protection software shows "Unable to save configuration"?</h3>
+        <p><strong>Cause</strong>: Security software may be blocking direct write operations to physical disk sectors, or the software was not run as administrator.<br>
+        <strong>Solution</strong>: Right-click and select "Run as administrator". Temporarily disable antivirus software, or if the driver is already loaded, the software will attempt to write configuration through the driver IOCTL interface (which is usually not blocked).</p>
+
+        <h3>Q2: Why do files copied in protection mode disappear after restart?</h3>
+        <p><strong>Answer</strong>: This is normal. In protection mode, all writes are temporary. After restart, the system discards all changes and reverts to the pre-protection state. To permanently save files, please disable protection first, or save to an unprotected partition (such as D: drive).</p>
+    </div>
+
+    <div class="footer">
+        <p>Copyright &copy; 2026 Diskflt Team. All Rights Reserved.</p>
+    </div>
+</div>
+
+<script>
+    // Language switching function
+    function switchLang(lang) {
+        // Hide all language sections
+        document.querySelectorAll('.lang-section').forEach(function(section) {
+            section.classList.remove('active');
+        });
+        
+        // Show selected language section
+        document.getElementById('content-' + lang).classList.add('active');
+        
+        // Update button states
+        document.querySelectorAll('.lang-btn').forEach(function(btn) {
+            btn.classList.remove('active');
+        });
+        document.getElementById('btn-' + lang).classList.add('active');
+        
+        // Update page title
+        if (lang === 'zh') {
+            document.getElementById('page-title').textContent = 'Diskflt 驱动使用说明书';
+        } else {
+            document.getElementById('page-title').textContent = 'Diskflt Driver User Manual';
+        }
+        
+        // Save language preference
+        localStorage.setItem('preferredLang', lang);
+    }
+    
+    // Auto-detect language on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check for saved preference first
+        var savedLang = localStorage.getItem('preferredLang');
+        if (savedLang) {
+            switchLang(savedLang);
+            return;
+        }
+        
+        // Auto-detect based on browser language
+        var userLang = navigator.language || navigator.userLanguage;
+        if (userLang && userLang.toLowerCase().startsWith('zh')) {
+            switchLang('zh');
+        } else {
+            switchLang('en');
+        }
+    });
+</script>
+
+</body>
+</html>

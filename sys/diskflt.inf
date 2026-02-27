@@ -1,0 +1,76 @@
+;
+; diskflt.inf
+;
+; Installation file for the Disk Filter Driver.
+;
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = DiskDrive
+ClassGuid   = {4d36e967-e325-11ce-bfc1-08002be10318}
+Provider    = %ProviderName%
+DriverVer   = 01/30/2026,1.0.0.0
+CatalogFile = diskflt.cat
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+diskflt.sys = 1,,
+
+;
+; Default install sections
+;
+
+[DefaultInstall]
+OptionDesc = %ServiceDescription%
+CopyFiles  = diskflt_Files
+
+[DefaultInstall.Services]
+AddService = %ServiceName%,,diskflt_Service_Inst
+
+[DefaultInstall.NT]
+CopyFiles  = diskflt_Files
+AddReg     = diskflt_AddReg
+
+[DefaultInstall.NT.Services]
+AddService = %ServiceName%,,diskflt_Service_Inst
+
+;
+; File Copy
+;
+
+[diskflt_Files]
+diskflt.sys
+
+;
+; Registry Modifications
+;
+
+[diskflt_AddReg]
+; Append "diskflt" to the UpperFilters of the DiskDrive Class
+; 0x00010008 = FLG_ADDREG_TYPE_MULTI_SZ (0x10000) | FLG_ADDREG_APPEND (0x00008)
+HKLM, System\CurrentControlSet\Control\Class\{4d36e967-e325-11ce-bfc1-08002be10318}, UpperFilters, 0x00010008, %ServiceName%
+
+;
+; Service Installation
+;
+
+[diskflt_Service_Inst]
+DisplayName    = %ServiceDisplayName%
+Description    = %ServiceDescription%
+ServiceBinary  = %12%\diskflt.sys
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 0               ; SERVICE_BOOT_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+LoadOrderGroup = "Pnp Filter"
+
+[Strings]
+ProviderName       = "MyCompany"
+DiskName           = "Disk Filter Driver Source Disk"
+ServiceName        = "diskflt"
+ServiceDisplayName = "Disk Filter Driver"
+ServiceDescription = "Disk Upper Filter Driver for Shadow Mode"
