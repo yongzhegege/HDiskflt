@@ -91,7 +91,7 @@ The client `protect.exe` runs as a background service but also accepts command-l
 客户端 `protect.exe` 作为后台服务运行，但也接受命令行参数进行管理。
 
 ### Commands / 常用命令
-
+![command](command.png)
 | Command / 命令 | Description / 描述 |
 | :--- | :--- |
 | `protect.exe /set 192.168.1.100` | Set Server IP manually. Triggers immediate reconnect.<br>手动设置服务端 IP。触发立即重连。 |
