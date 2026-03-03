@@ -2,7 +2,7 @@
 
 **Version / 版本: 2.5**
 
----
+---Only Win10 22h2 and Win11 25H2 were tested, and the software only supports UEFI mode and not LegacyMBR mode
 
 ## 1. Introduction / 产品简介
 
