@@ -1,4 +1,4 @@
-# Diskflt Protection System User Manual / Diskflt 保护系统用户手册
+![GUI](GUI.png)
 
 **Version / 版本: 2.5**
 
