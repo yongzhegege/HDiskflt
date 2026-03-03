@@ -1,5 +1,5 @@
 # Interaction Summary: Disk Filter Driver Development
-**Date:** 2026-01-28
+**Date:** 2026-03-03
 **Project:** Disk Filter Driver (diskflt.sys) & Protection Tool
 
 ## 1. Project Context
@@ -59,11 +59,21 @@ The objective is to develop and debug a disk filter driver (`diskflt.sys`) and a
     - **Risk:** Potential logical deadlock in Worker Thread, but this is the only viable path for a Shadow Mode driver that requires redirection.
   - **Implementation:** Removed the `if (Irp->Flags & IRP_PAGING_IO) { return FALSE; }` block in `diskflt.c`, allowing Paging I/O to fall through to the `ExInterlockedInsertTailList` logic.
 
+### 2.9 Tool Integration & Network Features (Latest Updates)
+- **Integration:** Integrated all functionality from `Protection.exe` (Standalone Tool) into `protect.exe` (Client Service). `protect.exe` now serves as both the background service and the command-line control tool.
+- **Auto-Discovery:**
+  - **Server (`ProtectServer.exe`)**: Implemented UDP Broadcast (Port 3000) to announce presence every 5 seconds.
+  - **Client (`protect.exe`)**: Implemented UDP Listener. Automatically detects server in the same VLAN and connects if no manual IP is configured.
+- **Instant Reconnect:**
+  - Modified `protect.exe` to support `RELOAD_CONFIG` (Control Code 128).
+  - When configuration is updated via CLI (`protect.exe /set <IP>`), the tool signals the running service to immediately reload configuration and reconnect, eliminating the need for a service restart.
+
 ## 3. Current Status
-- **Resolved:** Boot loop, BSOD, Login Hang, and Protection Failure.
-- **Pending:** User verification of the new driver build.
+- **Resolved:** Boot loop, BSOD, Login Hang, Protection Failure, and Tool Fragmentation.
+- **Pending:** Final deployment testing in multi-client environment.
 
 ## 4. Modified Files
-1.  `c:\Users\Administrator\Documents\pDISK\sys\diskflt.c` (Driver Logic - Paging I/O Queuing)
-2.  `c:\Users\Administrator\Documents\pDISK\App\Protection.cpp` (Control App - Logging)
-3.  `c:\Users\Administrator\Documents\pDISK\sys\install.bat` (Installation Script - Backup)
+1.  `c:\Users\Administrator\Documents\pDISK\sys\diskflt.c` (Driver Logic)
+2.  `c:\Users\Administrator\Documents\pDISK\App\protect_service.cpp` (Unified Client Service & Tool)
+3.  `c:\Users\Administrator\Documents\pDISK\App\ProtectServer.cs` (Server with Discovery)
+4.  `c:\Users\Administrator\Documents\pDISK\Netpect\install.bat` (Installation Script)
