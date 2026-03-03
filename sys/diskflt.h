@@ -35,6 +35,60 @@
 
 #define MAX_DOS_DRIVES 32
 
+#pragma pack(push, 1)
+
+typedef struct _FAT_BPB {
+    USHORT  wBytsPerSec;    // Bytes per sector
+    UCHAR   bySecPerClus;   // Sectors per cluster
+    USHORT  wRsvdSecCnt;    // Reserved sector count
+    UCHAR   byNumFATs;      // Number of FATs
+    USHORT  wRootEntCnt;    // Root directory entries
+    USHORT  wTotSec16;      // Total sectors (if zero, use wTotSec32)
+    UCHAR   byMedia;        // Media descriptor
+    USHORT  wFATSz16;       // Sectors per FAT (FAT12/FAT16)
+    USHORT  wSecPerTrk;     // Sectors per track
+    USHORT  wNumHeads;      // Number of heads
+    ULONG   dwHiddSec;      // Hidden sectors
+    ULONG   dwTotSec32;     // Total sectors (if wTotSec16 == 0)
+} FAT_BPB, *PFAT_BPB;
+
+typedef struct _FAT32_EBPB {
+    ULONG   dwFATSz32;      // Sectors per FAT (FAT32)
+    USHORT  wExtFlags;      // Extended flags
+    USHORT  wFSVer;         // File system version
+    ULONG   dwRootClus;     // Root directory cluster
+    USHORT  wFSInfo;        // FSInfo sector
+    USHORT  wBkBootSec;     // Backup boot sector
+    UCHAR   byReserved[12]; // Reserved
+    UCHAR   byDrvNum;       // Drive number
+    UCHAR   byReserved1;    // Reserved
+    UCHAR   byBootSig;      // Boot signature (0x29)
+    ULONG   dwVolID;        // Volume ID
+    UCHAR   byVolLab[11];   // Volume label
+    UCHAR   byFilSysType[8];// File system type
+} FAT32_EBPB, *PFAT32_EBPB;
+
+typedef struct _FAT_LBR {
+    UCHAR       pbyJmpBoot[3];  // Jump instruction to boot code
+    UCHAR       byOemName[8];   // OEM name
+    FAT_BPB     bpb;            // BIOS Parameter Block
+    union {
+        FAT32_EBPB ebpb32;      // Extended BPB for FAT32
+        struct {
+            UCHAR   byDrvNum;
+            UCHAR   byReserved1;
+            UCHAR   byBootSig;
+            ULONG   dwVolID;
+            UCHAR   byVolLab[11];
+            UCHAR   byFilSysType[8];
+        } ebpb16;
+    };
+    UCHAR       byBootCode[420]; // Boot code (adjust size for padding)
+    USHORT      wTrailSig;       // 0xAA55
+} FAT_LBR, *PFAT_LBR;
+
+#pragma pack(pop)
+
 typedef struct _PROTECT_INFO
 {
 	BYTE	magicChar[32];

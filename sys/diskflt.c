@@ -73,13 +73,17 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemLookasideInformation = 45
 } SYSTEM_INFORMATION_CLASS;
 
+#ifndef RTL_CONSTANT_STRING
 #define RTL_CONSTANT_STRING(s) { sizeof( s ) - sizeof( (s)[0] ), sizeof( s ), s}
+#endif
 #define	__free_Safe(_buffer)	{if (_buffer)__free(_buffer);}
 
 #define dprintf	if (DBG) DbgPrint
 
 VOID DiskFltLog(const char* format, ...);
 VOID LogToFile(CHAR* format, ...);
+
+NTSTATUS IsFileCreditable(PUNICODE_STRING filePath);
 
 
 
