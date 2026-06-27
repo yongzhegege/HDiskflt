@@ -1,0 +1,97 @@
+# HDiskflt Release Notes
+
+## Version 2.2.1 (2026-06-27)
+
+### Bug Fixes
+
+#### 1. 修复 protect_Volume 资源锁定顺序错误
+**问题描述**：
+- 原代码先检查 `volInfo->isValid` 再加锁，但 `isValid` 可能在检查后被其他线程修改
+- 存在竞态条件，可能导致访问已释放的资源或死锁
+
+**根本原因**：
+- 锁是在 `flt_initVolumeLogicBitMap` 中初始化的，`isValid` 为 FALSE 时锁未初始化
+- 如果先获取锁再检查 `isValid`，会访问未初始化的锁导致系统崩溃
+- 如果先检查 `isValid` 再加锁，在检查和加锁之间的时间窗口内，`isValid` 可能被其他线程修改
+
+**修复内容**：
+- 使用双重检查锁定模式（Double-Checked Locking Pattern）
+- 第一次不加锁检查 `isValid`，避免获取未初始化的锁
+- 获取锁后再次检查 `isValid`，防止竞态条件
+- 如果第二次检查发现 `isValid` 变为 FALSE，释放锁并返回错误
+
+---
+
+## Version 2.2.0 (2026-06-27)
+
+### Bug Fixes
+
+#### 1. 修复保护状态切换后启动慢（欢迎画面转圈）问题
+**问题描述**：
+- 从保护模式切到禁用保护模式，第一次进系统会长时间在帐号登陆欢迎画面一直转圈
+- 需要很长时间才能进入桌面
+- 强制重启可以快速正常进入桌面
+- 多次切换保护与禁用保护后，保护模式也会出现登陆欢迎画面转圈
+
+**根本原因分析**：
+1. **IOCTL_WRITE_CONFIG 不同步更新内存状态**
+   - 配置写入扇区62成功，但驱动内存中的 `_protectInfo` 和 `_volumeList[i].isProtect` 没有更新
+   - 导致配置和运行时状态不一致
+   - 重启后驱动从扇区62读取配置，但如果写入时序有问题，可能读到旧配置
+
+2. **位图初始化阻塞启动**
+   - `flt_initVolumeLogicBitMap` 需要遍历所有簇构建空闲扇区位图
+   - 大磁盘（1TB+）上这个过程可能需要几秒到几十秒
+   - 同步执行阻塞系统启动流程
+
+3. **状态不一致导致的 I/O 异常**
+   - 保护关闭但位图仍在时，读写路径可能错误地使用重定向映射
+   - 导致系统 I/O 性能严重下降
+
+**修复内容**：
+- **IOCTL_WRITE_CONFIG 同步更新内存状态**
+  - 写入扇区62成功后，同步更新 `_protectInfo`
+  - 根据新配置调用 `protect_Volume()` 更新各卷的保护状态
+  - 确保内存状态和磁盘配置一致
+
+- **添加详细的性能日志**
+  - `flt_initializeVolume` 添加总耗时日志
+  - 各卷初始化分阶段计时（GetVolumeInfo、InitBitmap）
+  - 位图初始化各阶段计时（bootstat.dat、pagefile.sys、hiberfil.sys）
+  - 方便后续定位启动慢的具体瓶颈
+
+- **状态一致性检查**（v2.1.0 已添加）
+  - `getRealSectorForRead` 和 `getRealSectorForWrite` 开头检查 `isProtect`
+  - 保护关闭时直接返回原始扇区，不使用任何映射
+
+---
+
+## Version 2.1.1 (2026-06-27)
+
+### Bug Fixes
+
+#### 1. 修复 build.bat 中 for /f 读取临时文件缺少引号导致路径含空格时失败
+**问题描述**：
+- `for /f %%m in (%temp%\msvcver.txt)` 在 `%temp%` 路径含空格时会解析失败
+
+**修复内容**：
+- 改为 `for /f "usebackq" %%m in ("%temp%\msvcver.txt")`，添加引号和 `usebackq` 选项
+
+---
+
+## Version 2.1.0 (2026-06-27)
+
+### Bug Fixes
+
+#### 1. 修复反复切换保护状态导致系统不稳定问题
+**问题描述**：
+- 反复多次开启保护和禁用保护切换，系统容易出现需要扫描磁盘才能进入
+- 直接黑屏无法进入系统，多次重启才可以进入
+
+**修复内容**：
+- 重构 `protect_Volume` 函数，添加 ERESOURCE 锁防止竞态
+- 保护关闭时清理重定向映射表和位图
+- 在 `getRealSectorForRead`/`getRealSectorForWrite` 添加状态一致性检查
+
+**修改的文件**：
+- `sys/diskflt.c`

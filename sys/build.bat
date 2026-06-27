@@ -6,14 +6,14 @@ setlocal
 :: ==========================================
 
 :: Visual Studio 编译器路径
-set CL_PATH="C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.50.35717\bin\Hostx64\x64\cl.exe"
-set LINK_PATH="C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.50.35717\bin\Hostx64\x64\link.exe"
+set CL_PATH="C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe"
+set LINK_PATH="C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\link.exe"
 
 :: WDK 根目录
 set WDK_ROOT=C:\Program Files (x86)\Windows Kits\10
 
 :: WDK 版本 (驱动核心文件)
-set WDK_VERSION=10.0.22621.0
+set WDK_VERSION=10.0.28000.0
 
 :: SDK 版本 (共享头文件，如 specstrings.h)
 :: 注意：您的环境中 WDK 和 SDK 版本不一致，这里分别设置

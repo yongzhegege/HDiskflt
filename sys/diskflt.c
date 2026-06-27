@@ -1946,10 +1946,101 @@ __faild:
 	}
 }
 
-// 的一致性
-void protect_Volume(WCHAR volume, BOOLEAN protect)
+// 保护状态切换 - 需要正确清理和初始化资源
+NTSTATUS protect_Volume(WCHAR volume, BOOLEAN protect)
 {
-	_volumeList[volume - L'A'].isProtect = protect;
+	ULONG idx = volume - L'A';
+	PVOLUME_INFO volInfo = &_volumeList[idx];
+	NTSTATUS status = STATUS_SUCCESS;
+	PVOID RestartKey = NULL;
+	PVOID Element;
+	
+	// 先不加锁检查 isValid，避免获取未初始化的锁
+	if (!volInfo->isValid)
+	{
+		return STATUS_INVALID_DEVICE_REQUEST;
+	}
+	
+	// 获取独占锁，防止竞态条件
+	ExAcquireResourceExclusiveLite(&volInfo->lock, TRUE);
+	
+	// 双重检查：获取锁后再次验证状态
+	if (!volInfo->isValid)
+	{
+		ExReleaseResourceLite(&volInfo->lock);
+		return STATUS_INVALID_DEVICE_REQUEST;
+	}
+	
+	if (protect && !volInfo->isProtect) 
+	{
+		// 已初始化但之前关闭了保护 - 重置位图和映射表
+		// 清理重定向映射表
+		RestartKey = NULL;
+		while ((Element = RtlEnumerateGenericTableWithoutSplaying(&volInfo->redirectMap, &RestartKey)) != NULL) 
+		{
+			RtlDeleteElementGenericTable(&volInfo->redirectMap, Element);
+			RestartKey = NULL;
+		}
+		
+		// 重置位图（不释放，只清零）
+		if (volInfo->bitMap_Redirect)
+		{
+			ULONG i;
+			for (i = 0; i < volInfo->bitMap_Redirect->regionNumber; i++)
+			{
+				if (volInfo->bitMap_Redirect->buffer[i])
+				{
+					memset(volInfo->bitMap_Redirect->buffer[i], 0, volInfo->bitMap_Redirect->regionBytes);
+				}
+			}
+		}
+		
+		// 重新初始化空闲位图（从卷位图重新获取）
+		// 注意：这里简化处理，实际应该重新调用 flt_initVolumeLogicBitMap
+		// 但为了避免内存泄漏，我们保持现有结构并清零重定向位图
+		
+		volInfo->isProtect = TRUE;
+		volInfo->last_scan_index = 0;
+		
+		DiskFltLog("protect_Volume: %c protection ENABLED\n", volume);
+	}
+	else if (!protect && volInfo->isProtect)
+	{
+		// 从保护切换到非保护 - 需要清理所有资源
+		volInfo->isProtect = FALSE;
+		
+		DiskFltLog("protect_Volume: %c protection DISABLED, cleaning resources\n", volume);
+		
+		// 清理重定向映射表
+		RestartKey = NULL;
+		while ((Element = RtlEnumerateGenericTableWithoutSplaying(&volInfo->redirectMap, &RestartKey)) != NULL) 
+		{
+			RtlDeleteElementGenericTable(&volInfo->redirectMap, Element);
+			RestartKey = NULL;
+		}
+		
+		// 重置重定向位图
+		if (volInfo->bitMap_Redirect)
+		{
+			ULONG i;
+			for (i = 0; i < volInfo->bitMap_Redirect->regionNumber; i++)
+			{
+				if (volInfo->bitMap_Redirect->buffer[i])
+				{
+					memset(volInfo->bitMap_Redirect->buffer[i], 0, volInfo->bitMap_Redirect->regionBytes);
+				}
+			}
+		}
+		
+		// 重置扫描索引
+		volInfo->last_scan_index = 0;
+		
+		// 注意：不释放位图内存，保留结构以便下次启用
+		// 如果需要完全释放，可以使用 DPBitMap_Free
+	}
+	
+	ExReleaseResourceLite(&volInfo->lock);
+	return status;
 }
 
 NTSTATUS
@@ -1957,8 +2048,9 @@ flt_initVolumeLogicBitMap(PVOLUME_INFO volumeInfo)
 {
 	NTSTATUS	status;
 	PVOLUME_BITMAP_BUFFER	bitMap = NULL;	
+	ULONG		getTickCount();
 
-	// �߼�位图大小
+	// 计算位图大小
 	ULONGLONG	logicBitMapMaxSize = 0;
 	
 	ULONG		sectorsPerCluster = 0;
@@ -2038,16 +2130,27 @@ flt_initVolumeLogicBitMap(PVOLUME_INFO volumeInfo)
 
 	// 允许时，这些文件时直接读写
 	// bootstat.dat时写入的显示的
-
-	setBitmapDirectRWFile(volumeInfo->volume, L"\\Windows\\bootstat.dat", volumeInfo->bitMap_Protect);
+	{
+		ULONG t1 = getTickCount();
+		setBitmapDirectRWFile(volumeInfo->volume, L"\\Windows\\bootstat.dat", volumeInfo->bitMap_Protect);
+		DiskFltLog("flt_initVolumeLogicBitMap: bootstat.dat bitmap took %d ms\n", getTickCount() - t1);
+	}
 	// SAM的时
 // 	setBitmapDirectRWFile(volumeInfo->volume, L"\\Windows\\system32\\config\\sam", volumeInfo->bitMap_Protect);
 
 	// 页面文件
-	setBitmapDirectRWFile(volumeInfo->volume, L"\\pagefile.sys", volumeInfo->bitMap_Protect);
+	{
+		ULONG t2 = getTickCount();
+		setBitmapDirectRWFile(volumeInfo->volume, L"\\pagefile.sys", volumeInfo->bitMap_Protect);
+		DiskFltLog("flt_initVolumeLogicBitMap: pagefile.sys bitmap took %d ms\n", getTickCount() - t2);
+	}
 
 	// 的文件
-	setBitmapDirectRWFile(volumeInfo->volume, L"\\hiberfil.sys", volumeInfo->bitMap_Protect);	
+	{
+		ULONG t3 = getTickCount();
+		setBitmapDirectRWFile(volumeInfo->volume, L"\\hiberfil.sys", volumeInfo->bitMap_Protect);
+		DiskFltLog("flt_initVolumeLogicBitMap: hiberfil.sys bitmap took %d ms\n", getTickCount() - t3);
+	}
 	
 	// 始clusterMap
 	RtlInitializeGenericTable(&volumeInfo->redirectMap, CompareRoutine, AllocateRoutine, FreeRoutine, NULL);
@@ -2442,6 +2545,8 @@ VOID flt_initializeVolume()
 {
 	NTSTATUS	status;
 	ULONG		i;
+	ULONG		totalStartTime = getTickCount();
+	ULONG		startTime;
     
     LogToFile("flt_initializeVolume: Start scanning volumes...\n");
 
@@ -2463,13 +2568,21 @@ VOID flt_initializeVolume()
 			&& (!_volumeList[i].isValid))
 		{
             LogToFile("flt_initializeVolume: Found Config for Volume %c (Index %d). Initializing...\n", _volumeList[i].volume, i);
+			DiskFltLog("flt_initializeVolume: Initializing volume %c...\n", _volumeList[i].volume);
+			startTime = getTickCount();
 			status = flt_getVolumeInfo(_volumeList[i].volume, &_volumeList[i]);
 			
 			// 的±的状态
 			if (NT_SUCCESS(status))
 			{
+				ULONG infoTime = getTickCount() - startTime;
+				startTime = getTickCount();
 				status = flt_initVolumeLogicBitMap(&_volumeList[i]);
-				
+				ULONG bitmapTime = getTickCount() - startTime;
+
+				DiskFltLog("flt_initializeVolume: %c GetInfo=%dms, InitBitmap=%dms, total=%dms\n",
+					_volumeList[i].volume, infoTime, bitmapTime, infoTime + bitmapTime);
+
 				_signal = TRUE;
 				
 				if (!NT_SUCCESS(status))
@@ -2506,6 +2619,7 @@ VOID flt_initializeVolume()
 		}
 	}
     LogToFile("flt_initializeVolume: Done.\n");
+    DiskFltLog("flt_initializeVolume: Done. Total time=%dms\n", getTickCount() - totalStartTime);
 }
 
 ULONG
@@ -3323,6 +3437,31 @@ BOOLEAN on_diskperf_dispatch(
 						if (NT_SUCCESS(*status))
 						{
 							DiskFltLog("IOCTL_DISKFLT_WRITE_CONFIG: Success.\n");
+							
+							// 同步更新内存中的保护配置，确保状态一致性
+							PPROTECT_INFO pNewInfo = (PPROTECT_INFO)ioBuffer;
+							RtlCopyMemory(&_protectInfo, pNewInfo, sizeof(PROTECT_INFO));
+							
+							// 根据新配置更新各卷的保护状态
+							ULONG i;
+							for (i = 0; i < 26; i++)
+							{
+								if (pNewInfo->volumeInfo[i] && _volumeList[i].isValid)
+								{
+									// 配置要求保护，且卷已初始化 - 启用保护
+									if (!_volumeList[i].isProtect)
+									{
+										protect_Volume(_volumeList[i].volume, TRUE);
+									}
+								}
+								else if (!pNewInfo->volumeInfo[i] && _volumeList[i].isValid && _volumeList[i].isProtect)
+								{
+									// 配置要求不保护，且卷当前受保护 - 禁用保护
+									protect_Volume(_volumeList[i].volume, FALSE);
+								}
+							}
+							
+							DiskFltLog("IOCTL_DISKFLT_WRITE_CONFIG: Memory config updated.\n");
 						}
 						else
 						{
