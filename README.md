@@ -1,8 +1,10 @@
 ![GUI](GUI.png)
 
-**Version / 版本: 2.5**
-
----Only Win10 22h2 and Win11 25H2 were tested, and the software only supports UEFI mode and not LegacyMBR mode
+**Version
+The software is open-source.  https://github.com/yongzhegege/HDiskflt
+输出的版本驱动已签名，已测试验证 Win10/Win11.功能正常
+The driver version has been signed and verified for compatibility with Windows 10/11. Functionality is normal.
+---The software only supports UEFI mode and not LegacyMBR mode
 
 ## 1. Introduction / 产品简介
 
